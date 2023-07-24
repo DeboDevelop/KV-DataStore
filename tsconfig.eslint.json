@@ -1,0 +1,9 @@
+{
+    "extends": "./tsconfig.json",
+    "include": ["src/**/*.ts"],
+    "rules": {
+      "@typescript-eslint/explicit-module-boundary-types": "off"
+      // Other TypeScript-specific rules...
+    }
+  }
+  
