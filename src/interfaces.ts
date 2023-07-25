@@ -2,7 +2,7 @@ import { Status } from "./enums";
 import { second } from "./types"
 
 export interface KVDataStoreInterface {
-    readonly name: string;
+    readonly storeName: string;
     readonly filePath: string;
     createData(key : string, value : Value, seconds : second) : Promise<Result>
     readData(key : string) : Promise<Result>

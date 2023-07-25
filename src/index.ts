@@ -6,10 +6,10 @@ import logger from "./logger";
 import * as FileUtility from "./utils/file_utility" 
 
 class KVDataStore implements KVDataStoreInterface {
-    readonly name: string;
+    readonly storeName: string;
     readonly filePath: string;
-    constructor(name: string, filePath: string = __dirname) {
-        this.name = name;
+    constructor(storeName: string, filePath: string = __dirname) {
+        this.storeName = storeName;
         try {
             //Checking whether the given path exist or not.
             if (fs.lstatSync(filePath).isDirectory() == true) this.filePath = filePath;
@@ -27,8 +27,8 @@ class KVDataStore implements KVDataStoreInterface {
                 this.filePath = __dirname;
             } else throw err;
         }
-        FileUtility.createInitialDirectory(this.name, this.filePath);
-        FileUtility.handleInitialShards(this.name, this.filePath);
+        FileUtility.createInitialDirectory(this.storeName, this.filePath);
+        FileUtility.handleInitialShards(this.storeName, this.filePath);
     }
 
     createData(key : string, value : Value, seconds : second = null) : Promise<Result> {
