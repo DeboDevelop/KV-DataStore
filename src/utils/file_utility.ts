@@ -50,3 +50,27 @@ export function handleInitialShards(storeName: string, filePath: string): void {
         throw error;
     }
 }
+
+export async function readFileAsync(filePath: string): Promise<string> {
+    return new Promise<string>((resolve, reject) => {
+        fs.readFile(filePath, 'utf8', (err, data) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve(data);
+            }
+        });
+    });
+}
+
+export async function writeFileAsync(filePath: string, data: string): Promise<void> {
+    return new Promise<void>((resolve, reject) => {
+        fs.writeFile(filePath, data, 'utf8', (err) => {
+            if (err) {
+                reject(err);
+            } else {
+                resolve();
+            }
+        });
+    });
+}

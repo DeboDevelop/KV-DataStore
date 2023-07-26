@@ -1,9 +1,13 @@
 import fs from "fs";
+import path from "path";
+import lockfile from "proper-lockfile";
 import { KVDataStoreInterface, Result, Value } from "./interfaces"
 import { second } from "./types"
 import { Status } from "./enums";
 import logger from "./logger";
-import * as FileUtility from "./utils/file_utility" 
+import * as FileUtility from "./utils/file_utility"
+import * as HashUtility from "./utils/hash_utility"
+import * as HelperUtility from "./utils/helper_utility" 
 
 class KVDataStore implements KVDataStoreInterface {
     readonly storeName: string;
@@ -31,13 +35,52 @@ class KVDataStore implements KVDataStoreInterface {
         FileUtility.handleInitialShards(this.storeName, this.filePath);
     }
 
-    createData(key : string, value : Value, seconds : second = null) : Promise<Result> {
-        return new Promise<Result>((resolve, reject) => {
-            reject({
-                status: Status.Failure,
-                message: `Input: ${key}, ${value}, ${seconds}, Function is yet to be implemented`
-            })
-        })
+    async createData(key : string, value : NonNullable<unknown>, seconds : second = null) : Promise<Result> {
+        // Check whether key is string or not. We want these check to exist in JS too.
+        if (typeof key !== "string") {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Key have to be String")
+        }
+        // Check whether value is null or not. (since null is treated as object in JS)
+        // We want these check to exist in JS too.
+        if (value === null) {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Value is Null")
+        }
+
+        // Hashing key
+        const fileName = HashUtility.fileSelect(HashUtility.hexToInt(HashUtility.md5(key)))
+        //Checking whether file/shard has been deleted or not.
+        if (FileUtility.fileExist(this.storeName, this.filePath, `${fileName}.json`) == false) {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
+        }
+        const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
+        try {
+            const fileData = JSON.parse(await FileUtility.readFileAsync(fileP));
+            logger.info(`File Data: ${JSON.stringify(fileData)}`)
+            if (Object.prototype.hasOwnProperty.call(fileData, key)) {
+                return HelperUtility.FailurePromise("Key already exist.")
+            }
+            const valueObj: Value = {
+                ttl: seconds,
+                createdAt: new Date(),
+                value
+            }
+            // inserting the new key value pair
+            fileData[key] = valueObj;
+            if (!(await lockfile.check(fileP))) {
+                const release = await lockfile.lock(fileP)
+                await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
+                await release();
+                return HelperUtility.SuccessPromise("Insertion of data is successful")
+            } else {
+                // Try after some time
+                return HelperUtility.retryWithDelay(this.createData, 3, 5 * 1000, key, value, seconds)
+            }
+        } catch(err) {
+            return HelperUtility.FailurePromise(`Error occured while inserting data: ${err}`)
+        }
     }
 
     readData(key : string) : Promise<Result> {
