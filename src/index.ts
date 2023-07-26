@@ -73,6 +73,9 @@ class KVDataStore implements KVDataStoreInterface {
                 const release = await lockfile.lock(fileP)
                 await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
                 await release();
+                if (seconds !== null) {
+                    this.deleteDataOnExpiry(key, seconds)
+                }
                 return HelperUtility.SuccessPromise("Insertion of data is successful")
             } else {
                 // Try after some time
@@ -141,6 +144,17 @@ class KVDataStore implements KVDataStoreInterface {
         } catch(err) {
             return HelperUtility.FailurePromise(`Error occured while deleting data: ${err}`)
         }
+    }
+    
+    private deleteDataOnExpiry(key : string, seconds : number) {
+        setTimeout( async () => {
+            try {
+                await this.deleteData(key);
+                logger.info(`${key} has been successfully deleted in the background job after expiry`)
+            } catch(err) {
+                logger.error(`Error occured while deleting ${key}, error: ${err}`)
+            }
+        }, seconds * 1000)
     }
 }
 
