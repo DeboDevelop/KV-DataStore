@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import lockfile from "proper-lockfile";
-import { KVDataStoreInterface, Result, Value } from "./interfaces"
+import { JsonDataFormat, KVDataStoreInterface, Result, Value } from "./interfaces"
 import { second } from "./types"
 import { Status } from "./enums";
 import logger from "./logger";
@@ -32,7 +32,7 @@ class KVDataStore implements KVDataStoreInterface {
             } else throw err;
         }
         FileUtility.createInitialDirectory(this.storeName, this.filePath);
-        FileUtility.handleInitialShards(this.storeName, this.filePath);
+        FileUtility.handleInitialShards(this.storeName, this.filePath, this);
     }
 
     async createData(key : string, value : NonNullable<unknown>, seconds : second = null) : Promise<Result> {
@@ -58,7 +58,7 @@ class KVDataStore implements KVDataStoreInterface {
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
 
         try {
-            const fileData = JSON.parse(await FileUtility.readFileAsync(fileP));
+            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
             if (Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key already exist.")
             }
@@ -127,7 +127,7 @@ class KVDataStore implements KVDataStoreInterface {
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
 
         try {
-            const fileData = JSON.parse(await FileUtility.readFileAsync(fileP));
+            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }

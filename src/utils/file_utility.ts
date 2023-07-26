@@ -1,8 +1,9 @@
 import fs from "fs";
 import path from "path";
 import logger from "../logger";
-import { Result } from "../interfaces"
+import { Result, JsonDataFormat } from "../interfaces"
 import { Status } from "../enums";
+import KVDataStore from "..";
 
 export function createInitialDirectory(storeName: string, filePath: string): void {
     try {
@@ -30,11 +31,15 @@ export function fileExist(storeName: string, filePath: string, fineName: string)
     }
 }
 
-export function handleInitialShards(storeName: string, filePath: string): void {
+export function handleInitialShards(storeName: string, filePath: string, obj: KVDataStore): void {
     let existingFileCount = 0;
     for (let i = 0; i < 10; i++) {
         // Checking whether the file exist or not
-        if (fileExist(storeName, filePath, `${i}.json`)) {
+        const fileName = `${i}.json`
+        if (fileExist(storeName, filePath, fileName)) {
+            const fileP = path.join(filePath, storeName, fileName);
+            const fileData = JSON.parse(fs.readFileSync(fileP, "utf8"));
+            checkForOutdatedData(fileData, obj);
             existingFileCount++;
         } else {
             // Creating the file(Shards) if they doesn't exist
@@ -48,6 +53,27 @@ export function handleInitialShards(storeName: string, filePath: string): void {
         logger.error("The files appear to have been altered or modified.");
         const error: Result = { status: Status.Failure, message: "The files appear to have been altered or modified."};
         throw error;
+    }
+}
+
+function checkForOutdatedData<T extends JsonDataFormat>(fileData: T, obj: KVDataStore) {
+    for (const k in fileData) {
+        const createdAt = new Date(fileData[k].createdAt);
+        const ttl = fileData[k].ttl
+        if (ttl !== null) {
+            createdAt.setSeconds(createdAt.getSeconds() + ttl);
+            const currDateTime = new Date();
+            if (currDateTime > createdAt) {
+                // Delete these data
+                obj.deleteData(k)
+                .then(() => {
+                    logger.info(`Deleted outdated data, Key: ${k}`)
+                })
+                .catch(err => {
+                    logger.error(`Failed to Delete outdated data, error: ${err}`)
+                })
+            }
+        }
     }
 }
 

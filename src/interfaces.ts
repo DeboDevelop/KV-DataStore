@@ -21,3 +21,7 @@ export interface Value {
     createdAt: Date,
     value: NonNullable<unknown>
 }
+
+export interface JsonDataFormat {
+    [index: string]: Value
+}
