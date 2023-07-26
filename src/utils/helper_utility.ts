@@ -15,16 +15,17 @@ export function SuccessPromise(message: string): Promise<Result> {
     });
 }
 
-export async function retryWithDelay<T>(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    func: (...args: any[]) => Promise<T>,
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function retryWithDelay<O extends Record<K, (...args: any[]) => any>, K extends keyof O, T>(
+    obj: O,
+    functionName: K,
     maxAttempts: number,
     delay: number,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ...args: any[]
     ): Promise<T> {
         try {
-            return await func(...args); // Try calling the original function with the provided arguments
+            return await obj[functionName](...args);
         } catch (error) {
             if (maxAttempts <= 1) {
                 // No more attempts left, reject with the last error
@@ -32,7 +33,7 @@ export async function retryWithDelay<T>(
             } else {
                 // Wait for the specified delay and retry
                 await new Promise<void>((resolve) => setTimeout(resolve, delay));
-                return retryWithDelay(func, maxAttempts - 1, delay, ...args);
+                return retryWithDelay(obj, functionName, maxAttempts - 1, delay, ...args);
             }
         }
   }

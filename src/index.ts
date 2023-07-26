@@ -79,7 +79,7 @@ class KVDataStore implements KVDataStoreInterface {
                 return HelperUtility.SuccessPromise("Insertion of data is successful")
             } else {
                 // Try after some time
-                return HelperUtility.retryWithDelay(this.createData, 3, 5 * 1000, key, value, seconds)
+                return HelperUtility.retryWithDelay(this, 'createData', 3, 5 * 1000, key, value, seconds)
             }
         } catch(err) {
             return HelperUtility.FailurePromise(`Error occured while inserting data: ${err}`)
@@ -139,7 +139,7 @@ class KVDataStore implements KVDataStoreInterface {
                 return HelperUtility.SuccessPromise("Deletion of data is successful")
             } else {
                 // Try after some time
-                return HelperUtility.retryWithDelay(this.deleteData, 3, 5 * 1000, key)
+                return HelperUtility.retryWithDelay(this, 'deleteData', 3, 5 * 1000, key)
             }
         } catch(err) {
             return HelperUtility.FailurePromise(`Error occured while deleting data: ${err}`)
