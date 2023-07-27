@@ -8,11 +8,15 @@ export function FailurePromise(message: string): Promise<Result> {
     });
 }
 
-export function SuccessPromise(message: string): Promise<Result> {
-    return Promise.resolve({
+export function SuccessPromise(message: string, data: unknown = null): Promise<Result> {
+    const res: Result = {
         status: Status.Success,
         message,
-    });
+    };
+    if (data !== null) {
+        res.data = data
+    }
+    return Promise.resolve(res);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

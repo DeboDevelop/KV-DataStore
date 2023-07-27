@@ -14,6 +14,7 @@ export interface KVDataStoreInterface {
 export interface Result {
     status: Status,
     message: string
+    data?: NonNullable<unknown>
 }
 
 export interface Value {
