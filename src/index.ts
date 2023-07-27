@@ -6,11 +6,13 @@ import { second } from "./types"
 import logger from "./logger";
 import * as FileUtility from "./utils/file_utility"
 import * as HashUtility from "./utils/hash_utility"
-import * as HelperUtility from "./utils/helper_utility" 
+import * as HelperUtility from "./utils/helper_utility"
+import { LRUCache } from 'typescript-lru-cache';
 
 class KVDataStore implements KVDataStoreInterface {
     readonly storeName: string;
     readonly filePath: string;
+    private cache: LRUCache<string, JsonDataFormat>
     constructor(storeName: string, filePath: string = __dirname) {
         this.storeName = storeName;
         try {
@@ -32,6 +34,10 @@ class KVDataStore implements KVDataStoreInterface {
         }
         FileUtility.createInitialDirectory(this.storeName, this.filePath);
         FileUtility.handleInitialShards(this.storeName, this.filePath, this);
+        this.cache = new LRUCache<string, JsonDataFormat>({
+            maxSize: 3,
+            entryExpirationTimeInMS: 1000 * 60 * 60,
+        });
     }
 
     async createData(key : string, value : NonNullable<unknown>, seconds : second = null) : Promise<Result> {
@@ -99,9 +105,11 @@ class KVDataStore implements KVDataStoreInterface {
             //returning appropriate promise
             return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
         }
-        const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
         try {
-            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            let fileData : JsonDataFormat | null = this.cache.get(`${fileName}.json`);
+            if (fileData === null ) {
+                fileData = await this.setFileDataInCache(`${fileName}.json`)
+            }
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }
@@ -130,9 +138,11 @@ class KVDataStore implements KVDataStoreInterface {
             return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
         }
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
-
         try {
-            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            let fileData : JsonDataFormat | null = this.cache.get(`${fileName}.json`);
+            if (fileData === null ) {
+                fileData = await this.setFileDataInCache(`${fileName}.json`)
+            }
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }
@@ -143,6 +153,7 @@ class KVDataStore implements KVDataStoreInterface {
                 const release = await lockfile.lock(fileP)
                 await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
                 await release();
+                await this.setFileDataInCache(`${fileName}.json`)
                 return HelperUtility.SuccessPromise("Updation of data is successful")
             } else {
                 // Try after some time
@@ -173,7 +184,10 @@ class KVDataStore implements KVDataStoreInterface {
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
 
         try {
-            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            let fileData : JsonDataFormat | null = this.cache.get(`${fileName}.json`);
+            if (fileData === null ) {
+                fileData = await this.setFileDataInCache(`${fileName}.json`)
+            }
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }
@@ -188,6 +202,7 @@ class KVDataStore implements KVDataStoreInterface {
                 await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
                 await release();
                 this.deleteDataOnExpiry(key, seconds);
+                await this.setFileDataInCache(`${fileName}.json`)
                 return HelperUtility.SuccessPromise("Updation of ttl is successful")
             } else {
                 // Try after some time
@@ -214,7 +229,10 @@ class KVDataStore implements KVDataStoreInterface {
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
 
         try {
-            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            let fileData : JsonDataFormat | null = this.cache.get(`${fileName}.json`);
+            if (fileData === null ) {
+                fileData = await this.setFileDataInCache(`${fileName}.json`)
+            }
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }
@@ -223,6 +241,7 @@ class KVDataStore implements KVDataStoreInterface {
                 delete fileData[key];
                 await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
                 await release();
+                await this.setFileDataInCache(`${fileName}.json`)
                 return HelperUtility.SuccessPromise("Deletion of data is successful")
             } else {
                 // Try after some time
@@ -242,6 +261,16 @@ class KVDataStore implements KVDataStoreInterface {
                 logger.error(`Error occured while deleting ${key}, error: ${err}`)
             }
         }, seconds * 1000)
+    }
+    private async setFileDataInCache(fileName: string): Promise<JsonDataFormat> {
+        try {
+            const fileP = path.join(this.filePath, this.storeName, fileName);
+            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            return Promise.resolve(fileData);
+        } catch (error) {
+            return Promise.reject(error);
+        }
+        
     }
 }
 
