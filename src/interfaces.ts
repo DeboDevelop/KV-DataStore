@@ -20,6 +20,7 @@ export interface Result {
 export interface Value {
     ttl: second,
     createdAt: Date,
+    updatedAt: Date,
     value: NonNullable<unknown>
 }
 

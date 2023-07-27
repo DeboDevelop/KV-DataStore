@@ -65,6 +65,7 @@ class KVDataStore implements KVDataStoreInterface {
             const valueObj: Value = {
                 ttl: seconds,
                 createdAt: new Date(),
+                updatedAt: new Date(),
                 value
             }
             // inserting the new key value pair
@@ -73,7 +74,7 @@ class KVDataStore implements KVDataStoreInterface {
                 const release = await lockfile.lock(fileP)
                 await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
                 await release();
-                if (seconds !== null) {
+                if (seconds !== null && typeof seconds === "number") {
                     this.deleteDataOnExpiry(key, seconds)
                 }
                 return HelperUtility.SuccessPromise("Insertion of data is successful")
@@ -110,13 +111,46 @@ class KVDataStore implements KVDataStoreInterface {
             return HelperUtility.FailurePromise(`Error occured while reading data: ${err}`)
         }
     }
-    updateData(key : string, value : Value) : Promise<Result> {
-        return new Promise<Result>((resolve, reject) => {
-            reject({
-                status: Status.Failure,
-                message: `Input: ${key}, ${value}, Function is yet to be implemented`
-            })
-        })
+    async updateData(key : string, value : NonNullable<unknown>) : Promise<Result> {
+        // Check whether key is string or not. We want these check to exist in JS too.
+        if (typeof key !== "string") {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Key have to be String")
+        }
+        // Check whether value is null or not. (since null is treated as object in JS)
+        // We want these check to exist in JS too.
+        if (value === null) {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Value is Null")
+        }
+        // Hashing key
+        const fileName = HashUtility.fileSelect(HashUtility.hexToInt(HashUtility.md5(key)))
+        //Checking whether file/shard has been deleted or not.
+        if (FileUtility.fileExist(this.storeName, this.filePath, `${fileName}.json`) == false) {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
+        }
+        const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
+        try {
+            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
+                return HelperUtility.FailurePromise("Key doesn't exist.")
+            }
+            // updating the new key value pair
+            fileData[key].value = value;
+            fileData[key].updatedAt = new Date();
+            if (!(await lockfile.check(fileP))) {
+                const release = await lockfile.lock(fileP)
+                await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
+                await release();
+                return HelperUtility.SuccessPromise("Updation of data is successful")
+            } else {
+                // Try after some time
+                return HelperUtility.retryWithDelay(this, 'updateData', 3, 5 * 1000, key, value)
+            }
+        } catch(err) {
+            return HelperUtility.FailurePromise(`Error occured while updating data: ${err}`)
+        }
     }
     updateTTL(key : string, seconds : number) : Promise<Result> {
         return new Promise<Result>((resolve, reject) => {
