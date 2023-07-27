@@ -14,7 +14,7 @@ module.exports = {
       node: true
     },
     rules: {
-      // Additional rules or overrides can be added here
+      '@typescript-eslint/no-extra-semi': 'error',
     }
   };
   

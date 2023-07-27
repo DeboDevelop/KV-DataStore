@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import logger from "../logger";
-import { Result, JsonDataFormat } from "../interfaces"
+import { Result, JsonDataFormat } from "../interfaces";
 import { Status } from "../enums";
 import KVDataStore from "..";
 
@@ -35,7 +35,7 @@ export function handleInitialShards(storeName: string, filePath: string, obj: KV
     let existingFileCount = 0;
     for (let i = 0; i < 10; i++) {
         // Checking whether the file exist or not
-        const fileName = `${i}.json`
+        const fileName = `${i}.json`;
         if (fileExist(storeName, filePath, fileName)) {
             const fileP = path.join(filePath, storeName, fileName);
             const fileData = JSON.parse(fs.readFileSync(fileP, "utf8"));
@@ -59,7 +59,7 @@ export function handleInitialShards(storeName: string, filePath: string, obj: KV
 function checkForOutdatedData<T extends JsonDataFormat>(fileData: T, obj: KVDataStore) {
     for (const k in fileData) {
         const createdAt = new Date(fileData[k].createdAt);
-        const ttl = fileData[k].ttl
+        const ttl = fileData[k].ttl;
         if (ttl !== null) {
             createdAt.setSeconds(createdAt.getSeconds() + ttl);
             const currDateTime = new Date();
@@ -71,7 +71,7 @@ function checkForOutdatedData<T extends JsonDataFormat>(fileData: T, obj: KVData
                 })
                 .catch(err => {
                     logger.error(`Failed to Delete outdated data, error: ${err}`)
-                })
+                });
             }
         }
     }

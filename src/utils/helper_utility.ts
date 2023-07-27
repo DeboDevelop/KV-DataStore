@@ -1,4 +1,4 @@
-import { Result } from "../interfaces"
+import { Result } from "../interfaces";
 import { Status } from "../enums";
 
 export function FailurePromise(message: string): Promise<Result> {
@@ -14,7 +14,7 @@ export function SuccessPromise(message: string, data: unknown = null): Promise<R
         message,
     };
     if (data !== null) {
-        res.data = data
+        res.data = data;
     }
     return Promise.resolve(res);
 }
