@@ -3,7 +3,6 @@ import path from "path";
 import lockfile from "proper-lockfile";
 import { JsonDataFormat, KVDataStoreInterface, Result, Value } from "./interfaces"
 import { second } from "./types"
-import { Status } from "./enums";
 import logger from "./logger";
 import * as FileUtility from "./utils/file_utility"
 import * as HashUtility from "./utils/hash_utility"
@@ -131,12 +130,13 @@ class KVDataStore implements KVDataStoreInterface {
             return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
         }
         const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
+
         try {
             const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
             if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
                 return HelperUtility.FailurePromise("Key doesn't exist.")
             }
-            // updating the new key value pair
+            // updating the key value pair
             fileData[key].value = value;
             fileData[key].updatedAt = new Date();
             if (!(await lockfile.check(fileP))) {
@@ -152,13 +152,50 @@ class KVDataStore implements KVDataStoreInterface {
             return HelperUtility.FailurePromise(`Error occured while updating data: ${err}`)
         }
     }
-    updateTTL(key : string, seconds : number) : Promise<Result> {
-        return new Promise<Result>((resolve, reject) => {
-            reject({
-                status: Status.Failure,
-                message: `Input: ${key}, ${seconds}, Function is yet to be implemented`
-            })
-        })
+    async updateTTL(key : string, seconds : number) : Promise<Result> {
+        // Check whether key is string or not. We want these check to exist in JS too.
+        if (typeof key !== "string") {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Key have to be String")
+        }
+        // Check whether second is number or not. We want these check to exist in JS too.
+        if (typeof seconds !== "number") {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("Value have to be number")
+        }
+        // Hashing key
+        const fileName = HashUtility.fileSelect(HashUtility.hexToInt(HashUtility.md5(key)))
+        //Checking whether file/shard has been deleted or not.
+        if (FileUtility.fileExist(this.storeName, this.filePath, `${fileName}.json`) == false) {
+            //returning appropriate promise
+            return HelperUtility.FailurePromise("The files appear to have been altered or modified.")
+        }
+        const fileP = path.join(this.filePath, this.storeName, `${fileName}.json`);
+
+        try {
+            const fileData: JsonDataFormat = JSON.parse(await FileUtility.readFileAsync(fileP));
+            if (!Object.prototype.hasOwnProperty.call(fileData, key)) {
+                return HelperUtility.FailurePromise("Key doesn't exist.")
+            }
+            if (fileData[key].ttl !== null) {
+                return HelperUtility.FailurePromise("TTL is already configured.")
+            }
+            // updating the key value pair
+            fileData[key].ttl = seconds;
+            fileData[key].updatedAt = new Date();
+            if (!(await lockfile.check(fileP))) {
+                const release = await lockfile.lock(fileP)
+                await FileUtility.writeFileAsync(fileP, JSON.stringify(fileData))
+                await release();
+                this.deleteDataOnExpiry(key, seconds);
+                return HelperUtility.SuccessPromise("Updation of ttl is successful")
+            } else {
+                // Try after some time
+                return HelperUtility.retryWithDelay(this, 'updateTTL', 3, 5 * 1000, key, seconds)
+            }
+        } catch(err) {
+            return HelperUtility.FailurePromise(`Error occured while updating ttl: ${err}`)
+        }
     }
     async deleteData(key : string) : Promise<Result> {
         // Check whether key is string or not. We want these check to exist in JS too.
